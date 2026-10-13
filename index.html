@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Weather</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,200;9..144,300&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--sky1:#2b5fa8;--sky2:#9cc4e8;--ridge:#0d1a2a;--glow:#fff3c4;--soft:rgba(255,255,255,.72)}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:#0b1220;color:#fff;font-family:'Instrument Sans',system-ui,sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+#stage{position:fixed;inset:0;background:linear-gradient(180deg,var(--sky1),var(--sky2));transition:background 1.2s}
+#photo{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1s}
+#photo.on{opacity:1}
+#tint{position:absolute;inset:0;transition:background 1.2s}
+#orb{position:absolute;width:180px;height:180px;border-radius:50%;top:16%;background:radial-gradient(circle,var(--glow) 0 22%,transparent 68%);transition:opacity 1s,right 1s}
+#stars{position:absolute;inset:0;opacity:0;transition:opacity 1.2s;background-image:radial-gradient(1.5px 1.5px at 20% 18%,#fff,transparent),radial-gradient(1px 1px at 60% 10%,#fff,transparent),radial-gradient(1.5px 1.5px at 80% 28%,#fff,transparent),radial-gradient(1px 1px at 35% 32%,#fff,transparent),radial-gradient(1px 1px at 90% 8%,#fff,transparent)}
+.cloud{position:absolute;width:70vw;height:18vh;border-radius:50%;filter:blur(34px);opacity:0;transition:opacity 1.2s,background 1.2s;animation:drift 80s linear infinite}
+.cloud:nth-of-type(2){top:26%;left:-20%;animation-duration:100s}
+.cloud:nth-of-type(3){top:12%;left:30%;animation-duration:120s}
+@keyframes drift{from{transform:translateX(-10vw)}to{transform:translateX(35vw)}}
+#fog{position:absolute;inset:auto 0 0 0;height:60%;background:linear-gradient(0deg,rgba(220,228,236,.85),transparent);opacity:0;transition:opacity 1.2s}
+#ridge{position:absolute;left:0;right:0;bottom:0;width:100%;height:42%;transition:opacity 1s}
+#fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#flash{position:absolute;inset:0;background:#dfe8ff;opacity:0;pointer-events:none}
+main{position:absolute;inset:0;z-index:2;overflow-y:auto;overscroll-behavior:contain}
+.wrap{max-width:640px;margin:0 auto}
+.hero{min-height:100svh;display:flex;flex-direction:column;justify-content:space-between;padding:calc(env(safe-area-inset-top,0px) + 18px) 24px 18px}
+#chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+#chips::-webkit-scrollbar,#hours::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;padding:7px 14px;border-radius:99px;font-size:.9rem;color:var(--soft);border:1px solid rgba(255,255,255,.28)}
+.chip.on{background:rgba(255,255,255,.92);color:#101826;border-color:transparent}
+#where{color:var(--soft);margin-top:12px;font-size:.95rem}
+#temp{font:200 clamp(6.5rem,32vw,11rem)/.9 'Fraunces',Georgia,serif;letter-spacing:-.04em;text-shadow:0 2px 30px rgba(0,0,0,.3)}
+#cond{font:300 1.6rem 'Fraunces',Georgia,serif;margin-top:10px}
+#detail,#msg{color:var(--soft);margin-top:8px;font-size:1rem}
+.hint{text-align:center;color:rgba(255,255,255,.55);font-size:.8rem;padding-top:10px}
+.panel{background:rgba(8,14,24,.58);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:16px;padding:16px;margin:0 16px 12px}
+.panel h2{font:500 .85rem 'Instrument Sans',sans-serif;color:var(--soft);margin-bottom:10px}
+#hours{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.h{flex:0 0 auto;min-width:54px;text-align:center;font-size:.85rem;color:var(--soft)}
+.h b{display:block;color:#fff;font-weight:500;font-size:1.05rem;margin:3px 0}
+.bar{height:34px;display:flex;align-items:flex-end;justify-content:center}
+.bar i{display:block;width:16px;background:#7fb3ee;border-radius:3px 3px 0 0;min-height:2px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 12px}
+.grid small{display:block;color:var(--soft);font-size:.8rem}
+.grid span{font-size:1.25rem}
+.row{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid rgba(255,255,255,.12)}
+.row:first-of-type{border-top:0}
+.row .d{width:48px}.row .p{width:46px;color:#9cc4ee;font-size:.9rem}.row .r{flex:1;text-align:right}
+.row .r span{color:var(--soft)}
+.links{display:flex;gap:18px;justify-content:space-between;padding:4px 20px calc(env(safe-area-inset-bottom,0px) + 28px);font-size:.9rem;color:rgba(255,255,255,.75)}
+dialog{margin:auto;border:0;border-radius:14px;padding:18px;width:min(92vw,400px);max-height:88vh;background:#101826;color:#fff}
+dialog::backdrop{background:rgba(0,0,0,.65)}
+dialog h3{font:500 1rem 'Instrument Sans';margin:14px 0 8px;color:#9cc4e8}
+dialog h3:first-child{margin-top:0}
+dialog select,.btn{width:100%;padding:11px;border-radius:8px;border:1px solid #334;background:#0b1220;color:#fff;font:1rem inherit;text-align:left;margin-bottom:6px}
+dialog p{font-size:.85rem;color:rgba(255,255,255,.7);line-height:1.45;margin-bottom:8px}
+dialog code{color:#cfe3ff}
+@media (prefers-reduced-motion:reduce){.cloud{animation:none}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="photo"></div><div id="stars"></div><div id="orb"></div>
+  <div class="cloud"></div><div class="cloud"></div><div class="cloud"></div>
+  <svg id="ridge" viewBox="0 0 400 170" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 95 C50 70 90 100 140 80 S240 40 290 75 S370 70 400 60 V170 H0Z" fill="var(--ridge)" opacity=".55"/>
+    <path d="M0 130 C60 105 110 135 170 115 S280 95 330 120 S385 118 400 110 V170 H0Z" fill="var(--ridge)"/>
+  </svg>
+  <div id="fog"></div><div id="tint"></div><canvas id="fx"></canvas><div id="flash"></div>
+</div>
+<main><div class="wrap">
+  <section class="hero">
+    <header><div id="chips"></div><div id="where"></div></header>
+    <div><div id="temp">--°</div><div id="cond"></div><div id="detail"></div><div id="msg"></div></div>
+    <div class="hint">Scroll for hourly, rain and 7-day</div>
+  </section>
+  <div class="panel"><h2>Next 24 hours</h2><div id="hours"></div></div>
+  <div class="panel"><h2>Rain expected</h2><div id="rain" class="grid"></div></div>
+  <div class="panel"><h2>Conditions</h2><div id="stats" class="grid"></div></div>
+  <div class="panel"><h2>7-day forecast</h2><div id="days"></div></div>
+  <div class="links"><a id="radar" target="_blank" rel="noopener" style="color:inherit">Open radar</a><button id="shuffle">Shuffle image</button><button id="set">Settings</button></div>
+</div></main>
+<input type="file" id="file" accept="image/*" multiple hidden>
+<dialog id="dlg">
+  <h3>Image theme</h3>
+  <select id="theme"></select>
+  <h3>Image library</h3>
+  <p id="libinfo"></p>
+  <p>Name each file <code>place.weather.number</code>, like <code>home.rain.1.jpg</code> or <code>home.rain.2.jpg</code>. One matching image is picked at random. Add a theme as a third part, like <code>home.rain.scifi.1.jpg</code>.</p>
+  <p>Places: <code>home</code> <code>indiantrail</code> <code>uptown</code> <code>mountholly</code> <code>northlake</code> <code>waxhaw</code> <code>minthill</code><br>Weather: <code>clear</code> <code>cloudy</code> <code>rain</code> <code>snow</code> <code>storm</code> <code>fog</code> <code>heat</code> <code>any</code></p>
+  <button class="btn" id="add">Add images</button>
+  <button class="btn" id="clear">Remove all images</button>
+  <h3>Place locations</h3>
+  <p>Stand at a place and tap its button to save that spot. Type your home address, or stand at home and tap the Home button. The address stays on your phone only.</p>
+  <input id="addr" class="btn" placeholder="Home street address, city, state"><button class="btn" id="addrsave">Save home address</button>
+  <div id="plist"></div>
+  <button class="btn" id="close" style="margin-top:10px">Done</button>
+</dialog>
+
+<script>
+const $=id=>document.getElementById(id);
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const PLACES=[
+ {id:'home',name:'Home',lat:35.0768,lon:-80.6692,r:.6,unset:true,addr:''},
+ {id:'indiantrail',name:'Indian Trail',lat:35.0768,lon:-80.6692,r:6},
+ {id:'uptown',name:'Uptown Charlotte',lat:35.2271,lon:-80.8431,r:4},
+ {id:'mountholly',name:'Mount Holly',lat:35.2979,lon:-81.0160,r:5},
+ {id:'northlake',name:'Northlake',lat:35.3453,lon:-80.8800,r:4},
+ {id:'waxhaw',name:'Waxhaw',lat:34.9244,lon:-80.7434,r:4},
+ {id:'minthill',name:'Mint Hill',lat:35.1796,lon:-80.6473,r:4}];
+const saved=store.get('coords')||{};
+PLACES.forEach(p=>{if(saved[p.id]){p.lat=saved[p.id][0];p.lon=saved[p.id][1];p.unset=false}});
+const hg=store.get('homegeo');if(hg&&!saved.home){PLACES[0].lat=hg[0];PLACES[0].lon=hg[1];PLACES[0].unset=false}
+async function homeGeo(){const h=PLACES[0],a=store.get('homeaddr');if(!h.unset||!a)return;try{const r=await (await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(a))).json();if(r[0]){h.lat=+r[0].lat;h.lon=+r[0].lon;h.unset=false;store.set('homegeo',[h.lat,h.lon])}}catch(e){}}
+let sel=store.get('sel')||'auto', cur=null, lastKey='', lastUrl=null, state={kind:'clear',night:false,intensity:1};
+
+/* ---------- scenes ---------- */
+const PAL={
+ 'clear-day':['#2a62b0','#a9d0f0','#10243a','#fff3c4'],'clear-night':['#05091a','#1b2a52','#04070f','#dfe8ff'],
+ 'heat-day':['#c2571f','#f6c27a','#3a1a0c','#fff0b0'],
+ 'cloudy-day':['#52627a','#a3b0c0','#1b2634','#e8eef5'],'cloudy-night':['#0d1320','#2a3446','#060a12','#8ea0bd'],
+ 'rain-day':['#2c3846','#667789','#121a24','#9fb1c4'],'rain-night':['#070b14','#1c2635','#04060b','#6d7f99'],
+ 'storm-day':['#1d2431','#4a5568','#0c1017','#b9c6ff'],'storm-night':['#04060d','#161c2c','#020306','#8a99ff'],
+ 'snow-day':['#7e8da0','#d6dee8','#2b3644','#ffffff'],'snow-night':['#10192b','#3a4963','#0a101c','#c8d6ee'],
+ 'fog-day':['#8a96a3','#cdd5dc','#3a4652','#f2f5f8'],'fog-night':['#1a212b','#3b4552','#0b0f15','#9aa6b4']};
+function classify(c){
+ if(c<=1)return{k:'clear',i:1};if(c===2)return{k:'cloudy',i:1,partly:1};if(c===3)return{k:'cloudy',i:2};
+ if(c===45||c===48)return{k:'fog',i:1};if(c>=51&&c<=57)return{k:'rain',i:1};
+ if(c>=61&&c<=67)return{k:'rain',i:c>=65?3:2};if(c>=71&&c<=77||c===85||c===86)return{k:'snow',i:c>=75?3:2};
+ if(c>=80&&c<=82)return{k:'rain',i:c===82?3:2};if(c>=95)return{k:'storm',i:3};return{k:'cloudy',i:1}}
+const DESC={0:'Clear',1:'Mostly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Freezing fog',51:'Light drizzle',53:'Drizzle',55:'Heavy drizzle',61:'Light rain',63:'Rain',65:'Heavy rain',66:'Freezing rain',67:'Freezing rain',71:'Light snow',73:'Snow',75:'Heavy snow',77:'Snow grains',80:'Rain showers',81:'Rain showers',82:'Violent showers',85:'Snow showers',86:'Heavy snow showers',95:'Thunderstorm',96:'Thunderstorm with hail',99:'Severe thunderstorm'};
+function applyScene(k,night,i,partly,heat){
+ state={kind:k,night,intensity:i};
+ const p=PAL[heat&&!night?'heat-day':k+'-'+(night?'night':'day')],r=document.documentElement.style;
+ r.setProperty('--sky1',p[0]);r.setProperty('--sky2',p[1]);r.setProperty('--ridge',p[2]);r.setProperty('--glow',p[3]);
+ $('stars').style.opacity=night&&(k==='clear'||partly)?.9:0;
+ $('orb').style.opacity=(k==='clear'||partly)?1:0;$('orb').style.right=night?'62%':'14%';
+ const cl=k==='clear'?0:(partly?.5:1);
+ document.querySelectorAll('.cloud').forEach(c=>{c.style.opacity=cl;c.style.background=night?'rgba(120,135,160,.4)':(k==='storm'||k==='rain'?'rgba(70,82,98,.7)':'rgba(255,255,255,.55)')});
+ $('fog').style.opacity=k==='fog'?1:0;
+ const on=$('photo').classList.contains('on');
+ $('tint').style.background=on?`linear-gradient(180deg,${p[0]}bb,${p[0]}22 38%,${p[2]}dd)`:'linear-gradient(180deg,rgba(0,0,0,.3),transparent 35%,rgba(0,0,0,.45))';
+ $('ridge').style.opacity=on?0:1;
+ $('stage').style.background=`linear-gradient(180deg,${p[0]},${p[1]})`;
+ seed()}
+const cv=$('fx'),cx=cv.getContext('2d');let parts=[],W,H;
+function size(){W=cv.width=innerWidth*devicePixelRatio;H=cv.height=innerHeight*devicePixelRatio}
+addEventListener('resize',size);size();
+function seed(){const k=state.kind,i=state.intensity,n=k==='rain'||k==='storm'?[0,120,260,420][i]:k==='snow'?[0,70,140,220][i]:0;
+ parts=Array.from({length:n},()=>({x:Math.random()*W,y:Math.random()*H,v:(k==='snow'?1.2:14)*(.6+Math.random()*.8),s:Math.random()*2+1,d:Math.random()*6}))}
+(function loop(){cx.clearRect(0,0,W,H);const k=state.kind,dp=devicePixelRatio;
+ if(k==='rain'||k==='storm'){cx.strokeStyle='rgba(200,215,235,.45)';cx.lineWidth=1.2*dp;cx.beginPath();
+  for(const p of parts){cx.moveTo(p.x,p.y);cx.lineTo(p.x-3*dp,p.y+p.v*1.4*dp);p.y+=p.v*dp;p.x-=.6*dp;if(p.y>H){p.y=-20;p.x=Math.random()*W}}cx.stroke()}
+ else if(k==='snow'){cx.fillStyle='rgba(255,255,255,.85)';
+  for(const p of parts){cx.beginPath();cx.arc(p.x,p.y,p.s*dp,0,6.3);cx.fill();p.y+=p.v*dp;p.d+=.02;p.x+=Math.sin(p.d)*.6*dp;if(p.y>H){p.y=-10;p.x=Math.random()*W}}}
+ requestAnimationFrame(loop)})();
+(function bolt(){if(state.kind==='storm')$('flash').animate([{opacity:0},{opacity:.7},{opacity:.1},{opacity:.5},{opacity:0}],{duration:520});setTimeout(bolt,4000+Math.random()*7000)})();
+
+/* ---------- image library (IndexedDB) ---------- */
+const WX=['clear','cloudy','rain','snow','storm','fog','heat','any'],ALIAS={sun:'clear',sunny:'clear',clouds:'cloudy',overcast:'cloudy',hot:'heat',thunder:'storm',thunderstorm:'storm'};
+let LIB=[];
+const idb=()=>new Promise((ok,no)=>{const r=indexedDB.open('wx',1);r.onupgradeneeded=()=>r.result.createObjectStore('img',{keyPath:'name'});r.onsuccess=()=>ok(r.result);r.onerror=no});
+async function libLoad(){try{const db=await idb();LIB=await new Promise(ok=>{const q=db.transaction('img').objectStore('img').getAll();q.onsuccess=()=>ok(q.result);q.onerror=()=>ok([])})}catch(e){LIB=[]}}
+function parse(n){const parts=n.replace(/\.[^.]+$/,'').toLowerCase().split('.');if(parts.length<2)return null;
+ const place=parts[0].replace(/[^a-z]/g,''),wx=ALIAS[parts[1]]||parts[1],theme=parts.slice(2).filter(x=>!/^\d+$/.test(x))[0]||'';
+ return PLACES.some(p=>p.id===place)&&WX.includes(wx)?{place,wx,theme}:null}
+async function libAdd(files){let ok=0,bad=[];const db=await idb(),tx=db.transaction('img','readwrite');
+ for(const f of files){const m=parse(f.name);if(m){tx.objectStore('img').put({...m,name:f.name.toLowerCase(),blob:f});ok++}else bad.push(f.name)}
+ await new Promise(r=>tx.oncomplete=r);await libLoad();
+ $('libinfo').textContent=`${LIB.length} images loaded.`+(bad.length?` Skipped ${bad.length} with names I couldn't read: ${bad.slice(0,3).join(', ')}`:'');lastKey='';refreshImage(true)}
+function pick(pid,wx){
+ let c=[];for(const k of [wx,wx==='heat'?'clear':null,'any'])if(k){c=LIB.filter(i=>i.place===pid&&i.wx===k);if(c.length)break}
+ const th=store.get('theme')||'random';
+ if(th==='none')c=c.filter(i=>!i.theme);else if(th!=='random'){const t=c.filter(i=>i.theme===th);if(t.length)c=t}
+ return c.length?c[Math.floor(Math.random()*c.length)]:null}
+let ctx={pid:null,wx:'clear'};
+function refreshImage(force){
+ const key=ctx.pid+'|'+ctx.wx+'|'+new Date().getHours();if(!force&&key===lastKey)return;lastKey=key;
+ const it=ctx.pid&&pick(ctx.pid,ctx.wx),p=$('photo');
+ if(lastUrl){URL.revokeObjectURL(lastUrl);lastUrl=null}
+ if(it){lastUrl=URL.createObjectURL(it.blob);p.style.backgroundImage=`url(${lastUrl})`;p.classList.add('on')}else p.classList.remove('on');
+ applyScene(state.kind,state.night,state.intensity,ctx.partly,ctx.heat)}
+
+/* ---------- places ---------- */
+const km=(a,b,c,d)=>{const R=6371,t=x=>x*Math.PI/180,q=Math.sin(t(c-a)/2)**2+Math.cos(t(a))*Math.cos(t(c))*Math.sin(t(d-b)/2)**2;return 2*R*Math.asin(Math.sqrt(q))};
+const gps=()=>new Promise(r=>{if(!navigator.geolocation)return r(null);navigator.geolocation.getCurrentPosition(p=>r([p.coords.latitude,p.coords.longitude]),()=>r(null),{timeout:7000,maximumAge:300000})});
+async function resolve(){
+ if(sel!=='auto'){const p=PLACES.find(x=>x.id===sel);return{id:p.id,name:p.name,lat:p.lat,lon:p.lon}}
+ const g=await gps();
+ if(g){let best=null,br=9;for(const p of PLACES){if(p.id==='home'&&p.unset)continue;const r=km(g[0],g[1],p.lat,p.lon)/(p.r*1.6);if(r<=1&&r<br){best=p;br=r}}
+  return best?{id:best.id,name:best.name,lat:g[0],lon:g[1]}:{id:null,name:'Current location',lat:g[0],lon:g[1]}}
+ const h=PLACES[0];return{id:'home',name:'Home',lat:h.lat,lon:h.lon,note:'GPS unavailable, showing Home.'}}
+function chips(){$('chips').innerHTML='';[{id:'auto',name:'Auto'},...PLACES].forEach(p=>{const b=document.createElement('button');b.className='chip'+(p.id===sel?' on':'');b.textContent=p.name;b.onclick=()=>{sel=p.id;store.set('sel',sel);lastKey='';chips();load()};$('chips').appendChild(b)})}
+
+/* ---------- weather ---------- */
+const f0=n=>Math.round(n),hr=s=>{const h=new Date(s).getHours();return(h%12||12)+(h<12?'a':'p')},tm=s=>new Date(s).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+const dir=d=>['N','NE','E','SE','S','SW','W','NW'][Math.round(d/45)%8];
+async function load(){
+ $('msg').textContent='';
+ try{
+  cur=await resolve();$('where').textContent=cur.name;if(cur.note)$('msg').textContent=cur.note;
+  $('radar').href=`https://www.rainviewer.com/map.html?loc=${cur.lat.toFixed(3)},${cur.lon.toFixed(3)},8`;
+  const u=`https://api.open-meteo.com/v1/forecast?latitude=${cur.lat}&longitude=${cur.lon}`+
+   `&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,is_day,wind_speed_10m,wind_gusts_10m,wind_direction_10m,pressure_msl`+
+   `&hourly=temperature_2m,precipitation_probability,precipitation,visibility`+
+   `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset,uv_index_max`+
+   `&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto&forecast_days=7`;
+  const d=await (await fetch(u)).json(),c=d.current,cl=classify(c.weather_code),dy=d.daily;
+  const heat=c.temperature_2m>=90&&(cl.k==='clear'||cl.k==='cloudy'),demo=location.hash.slice(1),dn=demo.endsWith('-night'),dk=demo.replace('-night','');
+  ctx={pid:cur.id,wx:PAL[dk+'-day']?dk:(heat?'heat':cl.k),partly:cl.partly,heat};
+  state={kind:PAL[dk+'-day']?dk:cl.k,night:PAL[dk+'-day']?dn:!c.is_day,intensity:PAL[dk+'-day']?2:cl.i};
+  lastKey='';refreshImage(true);applyScene(state.kind,state.night,state.intensity,cl.partly,heat);
+  $('temp').textContent=f0(c.temperature_2m)+'°';$('cond').textContent=DESC[c.weather_code]||'Cloudy';
+  $('detail').textContent=`High ${f0(dy.temperature_2m_max[0])}°  Low ${f0(dy.temperature_2m_min[0])}°  ·  ${dy.precipitation_probability_max[0]}% rain today`;
+  const now=c.time.slice(0,13);let i0=Math.max(d.hourly.time.findIndex(t=>t>=now),0);
+  $('hours').innerHTML=d.hourly.time.slice(i0,i0+24).map((t,j)=>{const k=i0+j,pp=d.hourly.precipitation_probability[k];
+   return `<div class="h">${j?hr(t):'Now'}<b>${f0(d.hourly.temperature_2m[k])}°</b><div class="bar"><i style="height:${Math.max(pp*.34,2)}px"></i></div>${pp}%</div>`}).join('');
+  const sum=(a,b)=>d.hourly.precipitation.slice(a,b).reduce((x,y)=>x+(y||0),0),peak=d.hourly.precipitation_probability.slice(i0,i0+24);
+  const pk=peak.indexOf(Math.max(...peak));
+  $('rain').innerHTML=[['Next 24 hours',sum(i0,i0+24).toFixed(2)+' in'],['Today total',dy.precipitation_sum[0].toFixed(2)+' in'],['Tomorrow',dy.precipitation_sum[1].toFixed(2)+' in'],['Likeliest at',Math.max(...peak)>0?hr(d.hourly.time[i0+pk])+' ('+Math.max(...peak)+'%)':'No rain expected']].map(x=>`<div><small>${x[0]}</small><span>${x[1]}</span></div>`).join('');
+  const vis=d.hourly.visibility[i0];
+  $('stats').innerHTML=[['Feels like',f0(c.apparent_temperature)+'°'],['Wind',f0(c.wind_speed_10m)+' mph '+dir(c.wind_direction_10m)],['Gusts',f0(c.wind_gusts_10m)+' mph'],['Humidity',c.relative_humidity_2m+'%'],['UV index (max today)',f0(dy.uv_index_max[0])],['Pressure',(c.pressure_msl*.02953).toFixed(2)+' inHg'],['Visibility',vis==null?'--':(vis/1609).toFixed(1)+' mi'],['Sunrise / sunset',tm(dy.sunrise[0])+' / '+tm(dy.sunset[0])]].map(x=>`<div><small>${x[0]}</small><span>${x[1]}</span></div>`).join('');
+  const lo=Math.min(...dy.temperature_2m_min),hi=Math.max(...dy.temperature_2m_max);
+  $('days').innerHTML=dy.time.map((t,j)=>{const a=(dy.temperature_2m_min[j]-lo)/(hi-lo)*100,b=(dy.temperature_2m_max[j]-lo)/(hi-lo)*100;
+   return `<div class="row"><div class="d">${j?new Date(t+'T12:00').toLocaleDateString([],{weekday:'short'}):'Today'}</div><div class="p">${dy.precipitation_probability_max[j]}%</div><div class="r"><span>${f0(dy.temperature_2m_min[j])}°</span> <span style="display:inline-block;width:70px;height:4px;background:rgba(255,255,255,.18);border-radius:2px;position:relative;vertical-align:middle"><i style="position:absolute;left:${a}%;width:${Math.max(b-a,6)}%;height:4px;border-radius:2px;background:#f6c27a"></i></span> ${f0(dy.temperature_2m_max[j])}°</div></div>`}).join('');
+ }catch(e){$('msg').textContent='Could not load weather. Check your connection, then scroll down and tap Settings or pull to refresh.';applyScene('cloudy',false,1)}}
+
+/* ---------- settings ---------- */
+function themes(){const t=[...new Set(LIB.map(i=>i.theme).filter(Boolean))],s=store.get('theme')||'random';
+ $('theme').innerHTML=`<option value="random">Random mix of all themes</option><option value="none">No theme (plain images only)</option>`+t.map(x=>`<option value="${x}">${x}</option>`).join('');$('theme').value=s}
+function plist(){$('plist').innerHTML='';PLACES.forEach(p=>{const b=document.createElement('button');b.className='btn';
+ b.textContent=(p.id==='home'&&p.unset?'Set Home to my location now':'Set '+p.name+' to my location now')+(p.unset&&p.id==='home'?'':'');
+ b.onclick=async()=>{b.textContent='Locating…';const g=await gps();if(!g){b.textContent='Location blocked. Allow it in browser settings.';return}
+  saved[p.id]=g;store.set('coords',saved);p.lat=g[0];p.lon=g[1];p.unset=false;b.textContent=p.name+' saved ✓'};$('plist').appendChild(b)})}
+$('addrsave').onclick=async()=>{store.set('homeaddr',$('addr').value.trim());store.set('homegeo',null);delete saved.home;store.set('coords',saved);PLACES[0].unset=true;await homeGeo();$('addrsave').textContent=PLACES[0].unset?'Address not found. Try adding the zip code':'Home saved ✓'};
+$('set').onclick=()=>{$('addr').value=store.get('homeaddr')||'';themes();plist();$('libinfo').textContent=`${LIB.length} images loaded.`;$('dlg').showModal()};
+$('close').onclick=()=>{$('dlg').close();load()};
+$('theme').onchange=e=>{store.set('theme',e.target.value);lastKey='';refreshImage(true)};
+$('add').onclick=()=>$('file').click();
+$('file').onchange=async e=>{await libAdd([...e.target.files]);themes();e.target.value=''};
+$('clear').onclick=async()=>{const db=await idb();db.transaction('img','readwrite').objectStore('img').clear();LIB=[];$('libinfo').textContent='0 images loaded.';themes();refreshImage(true)};
+$('shuffle').onclick=()=>refreshImage(true);
+
+(async()=>{await libLoad();chips();await homeGeo();await load()})();
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+setInterval(()=>{load()},15*60*1000);
+</script>
+</body>
+</html>
